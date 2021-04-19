@@ -710,6 +710,9 @@ static void clock_update_slave(struct clock *c)
 		pr_info("updating UTC offset to %d", c->tds.currentUtcOffset);
 		c->utc_offset = c->tds.currentUtcOffset;
 	}
+
+	// Port changed
+	c->step_window_counter = 0;
 }
 
 static int clock_utc_correct(struct clock *c, tmv_t ingress)
@@ -1103,7 +1106,8 @@ struct clock *clock_create(enum clock_type type, struct config *config,
 	c->kernel_leap = config_get_int(config, NULL, "kernel_leap");
 	c->utc_offset = config_get_int(config, NULL, "utc_offset");
 	c->time_source = config_get_int(config, NULL, "timeSource");
-	c->step_window = config_get_int(config, NULL, "step_window");
+	c->step_window = 0;
+	c->step_window_counter = 0;
 
 	if (c->free_running) {
 		c->clkid = CLOCK_INVALID;
@@ -1764,8 +1768,9 @@ int clock_switch_phc(struct clock *c, int phc_index)
 	return 0;
 }
 
-static void clock_step_window(struct clock *c)
+static void clock_step_window(struct clock *c, struct port *p)
 {
+	c->step_window = port_step_window(p);
 	if (!c->step_window) {
 		return;
 	}
@@ -1783,7 +1788,7 @@ static void clock_synchronize_locked(struct clock *c, double adj)
 	}
 }
 
-enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
+enum servo_state clock_synchronize(struct clock *c, struct port *p, tmv_t ingress, tmv_t origin)
 {
 	enum servo_state state = SERVO_UNLOCKED;
 	double adj, weight;
@@ -1841,7 +1846,7 @@ enum servo_state clock_synchronize(struct clock *c, tmv_t ingress, tmv_t origin)
 					-tmv_to_nanoseconds(c->master_offset));
 		}
 		tsproc_reset(c->tsproc, 0);
-		clock_step_window(c);
+		clock_step_window(c, p);
 		break;
 	case SERVO_LOCKED:
 		clock_synchronize_locked(c, adj);
