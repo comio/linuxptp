@@ -33,6 +33,9 @@
 #include "print.h"
 #include "util.h"
 
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
+
 struct interface {
 	STAILQ_ENTRY(interface) list;
 };
@@ -781,8 +784,8 @@ int config_read(const char *name, struct config *cfg)
 
 		if (parse_section_line(line, &current_section) == PARSED_OK) {
 			if (current_section == PORT_SECTION) {
-				char port[17];
-				if (1 != sscanf(line, " %16s", port)) {
+				char port[MAX_IFNAME_SIZE + 1];
+				if (1 != sscanf(line, " %" STRINGIFY(MAX_IFNAME_SIZE) "s", port)) {
 					fprintf(stderr, "could not parse port name on line %d\n",
 							line_num);
 					goto parse_error;
